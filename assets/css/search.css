@@ -1,0 +1,493 @@
+/**
+ * WooCommerce Typesense Search Styles
+ */
+
+/* Search Wrapper */
+.wts-search-wrapper {
+    position: relative;
+    max-width: 800px;
+    margin: 0 auto 30px;
+}
+
+/* Search Form */
+.wts-search-form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: #fff;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.wts-search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 16px;
+    padding: 8px;
+}
+
+.wts-search-button,
+.wts-voice-button,
+.wts-image-button {
+    background: #0073aa;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+}
+
+.wts-search-button:hover,
+.wts-voice-button:hover,
+.wts-image-button:hover {
+    background: #005177;
+}
+
+.wts-voice-button {
+    background: #46b450;
+    position: relative;
+}
+
+.wts-voice-button:hover {
+    background: #2ea02e;
+}
+
+.wts-voice-button.listening {
+    background: #dc3232;
+    animation: pulse 1.5s infinite;
+}
+
+.wts-image-button {
+    background: #826eb4;
+}
+
+.wts-image-button:hover {
+    background: #6c5a99;
+}
+
+/* Pulse Animation */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.wts-pulse {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.3);
+    animation: pulse-expand 1.5s infinite;
+}
+
+@keyframes pulse-expand {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1.5);
+        opacity: 0;
+    }
+}
+
+/* Suggestions */
+.wts-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+}
+
+.wts-suggestion-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.2s;
+}
+
+.wts-suggestion-item:hover {
+    background: #f9f9f9;
+}
+
+.wts-suggestion-image {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.wts-suggestion-content {
+    flex: 1;
+}
+
+.wts-suggestion-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.wts-suggestion-price {
+    color: #0073aa;
+    font-weight: 700;
+}
+
+/* Filters */
+.wts-filters {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.wts-filter-group {
+    margin-bottom: 20px;
+}
+
+.wts-filter-group:last-child {
+    margin-bottom: 0;
+}
+
+.wts-filter-title {
+    font-weight: 700;
+    margin-bottom: 10px;
+    font-size: 14px;
+    text-transform: uppercase;
+}
+
+.wts-facet-item {
+    display: block;
+    margin-bottom: 8px;
+    cursor: pointer;
+}
+
+.wts-facet-item input {
+    margin-right: 8px;
+}
+
+.wts-filter-price input {
+    width: 100px;
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+/* Sort */
+.wts-sort-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.wts-result-count {
+    font-weight: 600;
+    color: #666;
+}
+
+.wts-sort-select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+}
+
+/* Results */
+.wts-results {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.wts-product-item {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.wts-product-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.wts-product-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
+.wts-product-image {
+    width: 100%;
+    height: 250px;
+    object-fit: cover;
+}
+
+.wts-product-content {
+    padding: 15px;
+}
+
+.wts-product-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 10px;
+    color: #333;
+}
+
+.wts-product-description {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+.wts-product-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.wts-product-price {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0073aa;
+}
+
+.wts-product-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.wts-badge-sale {
+    background: #dc3232;
+    color: #fff;
+}
+
+.wts-product-stock {
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.wts-product-stock.in-stock {
+    color: #46b450;
+}
+
+.wts-product-stock.out-of-stock {
+    color: #dc3232;
+}
+
+.wts-product-rating {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+}
+
+.wts-stars {
+    color: #ffa500;
+}
+
+.wts-rating-value {
+    color: #666;
+}
+
+/* Loading */
+.wts-loading {
+    text-align: center;
+    padding: 40px;
+    display: none;
+}
+
+.wts-loading::after {
+    content: '';
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #0073aa;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* No Results */
+.wts-no-results {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+    font-size: 18px;
+}
+
+/* Error */
+.wts-error {
+    background: #ffebee;
+    color: #c62828;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+/* Load More */
+.wts-load-more {
+    display: block;
+    margin: 0 auto 30px;
+    padding: 12px 30px;
+    background: #0073aa;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.wts-load-more:hover {
+    background: #005177;
+}
+
+/* Image Upload */
+.wts-image-input {
+    display: none;
+}
+
+.wts-image-drop-zone {
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    padding: 30px;
+    text-align: center;
+    margin-bottom: 20px;
+    transition: border-color 0.3s;
+}
+
+.wts-image-drop-zone.dragover {
+    border-color: #0073aa;
+    background: #f0f8ff;
+}
+
+.wts-image-preview-container {
+    margin-bottom: 20px;
+}
+
+.wts-image-preview {
+    position: relative;
+    display: inline-block;
+}
+
+.wts-image-preview img {
+    max-width: 200px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.wts-image-remove {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    width: 30px;
+    height: 30px;
+    background: #dc3232;
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+}
+
+/* Notifications */
+.wts-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 10000;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+.wts-notification.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.wts-notification-info {
+    background: #0073aa;
+    color: #fff;
+}
+
+.wts-notification-success {
+    background: #46b450;
+    color: #fff;
+}
+
+.wts-notification-error {
+    background: #dc3232;
+    color: #fff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .wts-results {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
+    }
+
+    .wts-product-image {
+        height: 150px;
+    }
+
+    .wts-product-title {
+        font-size: 14px;
+    }
+
+    .wts-product-price {
+        font-size: 16px;
+    }
+
+    .wts-search-form {
+        flex-wrap: wrap;
+    }
+
+    .wts-search-input {
+        width: 100%;
+    }
+}
