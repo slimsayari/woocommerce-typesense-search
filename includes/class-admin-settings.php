@@ -38,12 +38,9 @@ class WTS_Admin_Settings {
      * Constructor
      */
     public function __construct() {
-        add_filter('woocommerce_settings_tabs_array', array($this, 'add_settings_tab'), 50);
-        add_action('woocommerce_settings_tabs_typesense', array($this, 'settings_tab'));
-        add_action('woocommerce_update_options_typesense', array($this, 'update_settings'));
-        add_action('woocommerce_admin_field_wts_test_connection', array($this, 'test_connection_field'));
-        add_action('woocommerce_admin_field_wts_bulk_sync', array($this, 'bulk_sync_field'));
-        add_action('woocommerce_admin_field_wts_analytics', array($this, 'analytics_field'));
+        // Admin menu
+        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_init', array($this, 'register_settings'));
         
         // AJAX handlers
         add_action('wp_ajax_wts_test_connection', array($this, 'ajax_test_connection'));
@@ -54,49 +51,135 @@ class WTS_Admin_Settings {
     }
     
     /**
-     * Add settings tab to WooCommerce
-     *
-     * @param array $tabs
-     * @return array
+     * Add admin menu
      */
-    public function add_settings_tab($tabs) {
-        $tabs['typesense'] = __('Typesense', 'woocommerce-typesense-search');
-        return $tabs;
+    public function add_admin_menu() {
+        add_menu_page(
+            __('Typesense Search', 'woocommerce-typesense-search'),
+            __('Typesense', 'woocommerce-typesense-search'),
+            'manage_options',
+            'wts-settings',
+            array($this, 'render_settings_page'),
+            'dashicons-search',
+            56
+        );
     }
     
     /**
-     * Settings tab content
+     * Register settings
      */
-    public function settings_tab() {
-        woocommerce_admin_fields($this->get_settings());
+    public function register_settings() {
+        register_setting('wts_settings_group', 'wts_settings');
     }
     
     /**
-     * Update settings
+     * Render settings page
      */
-    public function update_settings() {
+    public function render_settings_page() {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+        ?>
+        <div class="wrap">
+            <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
+            <form action="options.php" method="post">
+                <?php
+                settings_fields('wts_settings_group');
+                $this->render_settings_fields();
+                submit_button();
+                ?>
+            </form>
+        </div>
+        <?php
+    }
+    
+    /**
+     * Render settings fields
+     */
+    public function render_settings_fields() {
         $settings = $this->get_settings();
         
-        // Collect all setting values
-        $values = array();
+        echo '<table class="form-table" role="presentation">';
+        
         foreach ($settings as $setting) {
-            if (isset($setting['id']) && !in_array($setting['type'], array('title', 'sectionend', 'wts_test_connection', 'wts_bulk_sync', 'wts_analytics'))) {
-                $option_value = null;
-                
-                if (isset($_POST[$setting['id']])) {
-                    $option_value = $_POST[$setting['id']];
-                } elseif ($setting['type'] === 'checkbox') {
-                    $option_value = 'no';
+            if ($setting['type'] === 'title') {
+                if ($setting['id'] !== 'wts_config') {
+                    echo '</table>';
                 }
-                
-                if ($option_value !== null) {
-                    $key = str_replace('wts_', '', $setting['id']);
-                    $values[$key] = $option_value;
+                echo '<h2>' . esc_html($setting['title']) . '</h2>';
+                if (!empty($setting['desc'])) {
+                    echo '<p>' . esc_html($setting['desc']) . '</p>';
                 }
+                echo '<table class="form-table" role="presentation">';
+                continue;
             }
+            
+            if ($setting['type'] === 'sectionend') {
+                continue;
+            }
+
+            // Custom fields
+            if ($setting['type'] === 'wts_test_connection') {
+                $this->test_connection_field();
+                continue;
+            }
+            if ($setting['type'] === 'wts_bulk_sync') {
+                $this->bulk_sync_field();
+                continue;
+            }
+            if ($setting['type'] === 'wts_analytics') {
+                $this->analytics_field();
+                continue;
+            }
+
+            // Standard fields
+            $id = $setting['id'];
+            $key = str_replace('wts_', '', $id);
+            $name = "wts_settings[$key]";
+            $value = isset($setting['value']) ? $setting['value'] : '';
+            
+            echo '<tr>';
+            echo '<th scope="row"><label for="' . esc_attr($id) . '">' . esc_html($setting['title']) . '</label></th>';
+            echo '<td>';
+            
+            switch ($setting['type']) {
+                case 'text':
+                case 'password':
+                    $type = $setting['type'];
+                    $readonly = isset($setting['custom_attributes']['readonly']) ? 'readonly' : '';
+                    $placeholder = isset($setting['placeholder']) ? 'placeholder="' . esc_attr($setting['placeholder']) . '"' : '';
+                    echo '<input name="' . esc_attr($name) . '" type="' . $type . '" id="' . esc_attr($id) . '" value="' . esc_attr($value) . '" class="regular-text" ' . $readonly . ' ' . $placeholder . ' />';
+                    break;
+                    
+                case 'checkbox':
+                    echo '<input type="hidden" name="' . esc_attr($name) . '" value="no">';
+                    echo '<input name="' . esc_attr($name) . '" type="checkbox" id="' . esc_attr($id) . '" value="yes" ' . checked('yes', $value, false) . ' />';
+                    break;
+                    
+                case 'select':
+                    echo '<select name="' . esc_attr($name) . '" id="' . esc_attr($id) . '">';
+                    foreach ($setting['options'] as $opt_val => $opt_label) {
+                        echo '<option value="' . esc_attr($opt_val) . '" ' . selected($opt_val, $value, false) . '>' . esc_html($opt_label) . '</option>';
+                    }
+                    echo '</select>';
+                    break;
+                    
+                case 'number':
+                    $min = isset($setting['custom_attributes']['min']) ? 'min="' . $setting['custom_attributes']['min'] . '"' : '';
+                    $step = isset($setting['custom_attributes']['step']) ? 'step="' . $setting['custom_attributes']['step'] . '"' : '';
+                    echo '<input name="' . esc_attr($name) . '" type="number" id="' . esc_attr($id) . '" value="' . esc_attr($value) . '" class="small-text" ' . $min . ' ' . $step . ' />';
+                    break;
+            }
+            
+            if (!empty($setting['desc'])) {
+                echo '<p class="description">' . esc_html($setting['desc']) . '</p>';
+            }
+            
+            echo '</td>';
+            echo '</tr>';
         }
         
-        update_option('wts_settings', $values);
+        echo '</table>';
     }
     
     /**
@@ -105,6 +188,8 @@ class WTS_Admin_Settings {
      * @return array
      */
     public function get_settings() {
+        $opts = get_option('wts_settings', array());
+        
         $settings = array(
             array(
                 'title' => __('Typesense Configuration', 'woocommerce-typesense-search'),
@@ -118,40 +203,53 @@ class WTS_Admin_Settings {
                 'id' => 'wts_enabled',
                 'default' => 'no',
                 'type' => 'checkbox',
+                'value' => isset($opts['enabled']) ? $opts['enabled'] : 'no',
             ),
             array(
                 'title' => __('Host', 'woocommerce-typesense-search'),
-                'desc' => __('Typesense server host (e.g., localhost or typesense.example.com)', 'woocommerce-typesense-search'),
+                'desc' => __('Typesense server host (auto-detected from Docker)', 'woocommerce-typesense-search'),
                 'id' => 'wts_host',
                 'type' => 'text',
-                'default' => '',
-                'placeholder' => 'localhost',
+                'default' => $this->get_default_host(),
+                'placeholder' => 'typesense',
+                'value' => isset($opts['host']) ? $opts['host'] : $this->get_default_host(),
             ),
             array(
                 'title' => __('Port', 'woocommerce-typesense-search'),
-                'desc' => __('Typesense server port', 'woocommerce-typesense-search'),
+                'desc' => __('Typesense server port (auto-detected from Docker)', 'woocommerce-typesense-search'),
                 'id' => 'wts_port',
                 'type' => 'text',
-                'default' => '8108',
+                'default' => $this->get_default_port(),
                 'placeholder' => '8108',
+                'value' => isset($opts['port']) ? $opts['port'] : $this->get_default_port(),
             ),
             array(
                 'title' => __('Protocol', 'woocommerce-typesense-search'),
-                'desc' => __('Connection protocol', 'woocommerce-typesense-search'),
+                'desc' => __('Connection protocol (auto-detected from Docker)', 'woocommerce-typesense-search'),
                 'id' => 'wts_protocol',
                 'type' => 'select',
-                'default' => 'https',
+                'default' => $this->get_default_protocol(),
                 'options' => array(
                     'http' => 'HTTP',
                     'https' => 'HTTPS',
                 ),
+                'value' => isset($opts['protocol']) ? $opts['protocol'] : $this->get_default_protocol(),
+            ),
+            array(
+                'title' => __('Connection URL', 'woocommerce-typesense-search'),
+                'desc' => __('Generated URL based on settings', 'woocommerce-typesense-search'),
+                'id' => 'wts_connection_url',
+                'type' => 'text',
+                'custom_attributes' => array('readonly' => 'readonly'),
+                'value' => (isset($opts['protocol']) ? $opts['protocol'] : $this->get_default_protocol()) . '://' . (isset($opts['host']) ? $opts['host'] : $this->get_default_host()) . ':' . (isset($opts['port']) ? $opts['port'] : $this->get_default_port()),
             ),
             array(
                 'title' => __('API Key', 'woocommerce-typesense-search'),
-                'desc' => __('Typesense API key', 'woocommerce-typesense-search'),
+                'desc' => __('Typesense API key (auto-detected from Docker)', 'woocommerce-typesense-search'),
                 'id' => 'wts_api_key',
                 'type' => 'password',
-                'default' => '',
+                'default' => $this->get_default_api_key(),
+                'value' => isset($opts['api_key']) ? $opts['api_key'] : $this->get_default_api_key(),
             ),
             array(
                 'title' => __('Collection Name', 'woocommerce-typesense-search'),
@@ -160,6 +258,7 @@ class WTS_Admin_Settings {
                 'type' => 'text',
                 'default' => 'products',
                 'placeholder' => 'products',
+                'value' => isset($opts['collection_name']) ? $opts['collection_name'] : 'products',
             ),
             array(
                 'type' => 'wts_test_connection',
@@ -180,6 +279,7 @@ class WTS_Admin_Settings {
                 'id' => 'wts_auto_sync',
                 'default' => 'yes',
                 'type' => 'checkbox',
+                'value' => isset($opts['auto_sync']) ? $opts['auto_sync'] : 'yes',
             ),
             array(
                 'type' => 'wts_bulk_sync',
@@ -200,6 +300,7 @@ class WTS_Admin_Settings {
                 'id' => 'wts_typo_tolerance',
                 'default' => 'yes',
                 'type' => 'checkbox',
+                'value' => isset($opts['typo_tolerance']) ? $opts['typo_tolerance'] : 'yes',
             ),
             array(
                 'title' => __('Voice Search', 'woocommerce-typesense-search'),
@@ -207,6 +308,7 @@ class WTS_Admin_Settings {
                 'id' => 'wts_voice_search_enabled',
                 'default' => 'yes',
                 'type' => 'checkbox',
+                'value' => isset($opts['voice_search_enabled']) ? $opts['voice_search_enabled'] : 'yes',
             ),
             array(
                 'title' => __('Image Search', 'woocommerce-typesense-search'),
@@ -214,6 +316,7 @@ class WTS_Admin_Settings {
                 'id' => 'wts_image_search_enabled',
                 'default' => 'yes',
                 'type' => 'checkbox',
+                'value' => isset($opts['image_search_enabled']) ? $opts['image_search_enabled'] : 'yes',
             ),
             array(
                 'title' => __('Semantic Search', 'woocommerce-typesense-search'),
@@ -221,6 +324,7 @@ class WTS_Admin_Settings {
                 'id' => 'wts_semantic_search_enabled',
                 'default' => 'no',
                 'type' => 'checkbox',
+                'value' => isset($opts['semantic_search_enabled']) ? $opts['semantic_search_enabled'] : 'no',
             ),
             array(
                 'title' => __('OpenAI API Key', 'woocommerce-typesense-search'),
@@ -228,6 +332,7 @@ class WTS_Admin_Settings {
                 'id' => 'wts_openai_api_key',
                 'type' => 'password',
                 'default' => '',
+                'value' => isset($opts['openai_api_key']) ? $opts['openai_api_key'] : '',
             ),
             array(
                 'type' => 'sectionend',
@@ -245,6 +350,7 @@ class WTS_Admin_Settings {
                 'id' => 'wts_cache_enabled',
                 'default' => 'yes',
                 'type' => 'checkbox',
+                'value' => isset($opts['cache_enabled']) ? $opts['cache_enabled'] : 'yes',
             ),
             array(
                 'title' => __('Cache TTL', 'woocommerce-typesense-search'),
@@ -256,6 +362,7 @@ class WTS_Admin_Settings {
                     'min' => '60',
                     'step' => '60',
                 ),
+                'value' => isset($opts['cache_ttl']) ? $opts['cache_ttl'] : '3600',
             ),
             array(
                 'type' => 'sectionend',
@@ -277,6 +384,63 @@ class WTS_Admin_Settings {
         );
         
         return apply_filters('wts_settings', $settings);
+    }
+    
+    /**
+     * Get default host from environment
+     *
+     * @return string
+     */
+    private function get_default_host() {
+        // Try to detect from Docker environment
+        // In Docker, the service name is 'typesense'
+        return 'typesense';
+    }
+    
+    /**
+     * Get default port from environment
+     *
+     * @return string
+     */
+    private function get_default_port() {
+        // Try to get from environment variable
+        $port = getenv('TYPESENSE_PORT');
+        return $port ? $port : '8108';
+    }
+    
+    /**
+     * Get default protocol from environment
+     *
+     * @return string
+     */
+    private function get_default_protocol() {
+        // In Docker local environment, use HTTP
+        // In production, use HTTPS
+        return (defined('WP_ENV') && WP_ENV === 'production') ? 'https' : 'http';
+    }
+    
+    /**
+     * Get default API key from environment
+     *
+     * @return string
+     */
+    private function get_default_api_key() {
+        // Try to get from environment variable
+        $api_key = getenv('TYPESENSE_API_KEY');
+        return $api_key ? $api_key : '';
+    }
+    
+    /**
+     * Get connection URL for display
+     *
+     * @param array $opts
+     * @return string
+     */
+    private function get_connection_url($opts) {
+        $protocol = isset($opts['protocol']) ? $opts['protocol'] : $this->get_default_protocol();
+        $host = isset($opts['host']) ? $opts['host'] : $this->get_default_host();
+        $port = isset($opts['port']) ? $opts['port'] : $this->get_default_port();
+        return "$protocol://$host:$port";
     }
     
     /**
@@ -305,23 +469,61 @@ class WTS_Admin_Settings {
      * Bulk sync field
      */
     public function bulk_sync_field() {
-        $total_products = WTS_Product_Indexer::instance()->get_total_products();
+        $sync_manager = WTS_Sync_Manager::instance();
+        $totals = $sync_manager->get_totals();
         ?>
         <tr valign="top">
             <th scope="row" class="titledesc">
-                <?php _e('Bulk Sync', 'woocommerce-typesense-search'); ?>
+                <?php _e('Synchronisation', 'woocommerce-typesense-search'); ?>
             </th>
             <td class="forminp">
-                <button type="button" id="wts-bulk-sync" class="button button-primary">
-                    <?php _e('Sync All Products', 'woocommerce-typesense-search'); ?>
-                </button>
-                <p class="description">
-                    <?php printf(__('Total products: %d', 'woocommerce-typesense-search'), $total_products); ?>
-                </p>
-                <div id="wts-sync-progress" style="display:none; margin-top: 10px;">
-                    <progress id="wts-progress-bar" max="100" value="0" style="width: 100%; height: 30px;"></progress>
-                    <p id="wts-progress-text">0 / 0</p>
+                <div style="margin-bottom: 20px;">
+                    <h4><?php _e('Statistiques', 'woocommerce-typesense-search'); ?></h4>
+                    <table class="widefat" style="max-width: 500px;">
+                        <thead>
+                            <tr>
+                                <th><?php _e('Type', 'woocommerce-typesense-search'); ?></th>
+                                <th><?php _e('Total', 'woocommerce-typesense-search'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><?php _e('Produits', 'woocommerce-typesense-search'); ?></td>
+                                <td><strong><?php echo number_format($totals['products']); ?></strong></td>
+                            </tr>
+                            <tr>
+                                <td><?php _e('Articles', 'woocommerce-typesense-search'); ?></td>
+                                <td><strong><?php echo number_format($totals['posts']); ?></strong></td>
+                            </tr>
+                            <tr>
+                                <td><?php _e('Catégories', 'woocommerce-typesense-search'); ?></td>
+                                <td><strong><?php echo number_format($totals['categories']); ?></strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <button type="button" id="wts-sync-products" class="button button-primary">
+                        <?php _e('🔄 Synchroniser les Produits', 'woocommerce-typesense-search'); ?>
+                    </button>
+                    <button type="button" id="wts-sync-posts" class="button button-primary" style="margin-left: 10px;">
+                        <?php _e('📝 Synchroniser les Articles', 'woocommerce-typesense-search'); ?>
+                    </button>
+                    <button type="button" id="wts-sync-all" class="button button-secondary" style="margin-left: 10px;">
+                        <?php _e('⚡ Tout Synchroniser', 'woocommerce-typesense-search'); ?>
+                    </button>
+                </div>
+                
+                <div id="wts-sync-progress" style="display:none; margin-top: 15px; padding: 15px; background: #f0f0f1; border-radius: 4px;">
+                    <p id="wts-sync-status" style="margin: 0 0 10px 0; font-weight: bold;"></p>
+                    <progress id="wts-progress-bar" max="100" value="0" style="width: 100%; height: 30px;"></progress>
+                    <p id="wts-progress-text" style="margin: 10px 0 0 0;">0 / 0</p>
+                </div>
+                
+                <p class="description">
+                    <?php _e('La synchronisation se fait par lots de 50 éléments pour éviter les timeouts.', 'woocommerce-typesense-search'); ?>
+                </p>
             </td>
         </tr>
         <?php
@@ -483,11 +685,7 @@ class WTS_Admin_Settings {
      * @param string $hook
      */
     public function enqueue_admin_scripts($hook) {
-        if ($hook !== 'woocommerce_page_wc-settings') {
-            return;
-        }
-        
-        if (!isset($_GET['tab']) || $_GET['tab'] !== 'typesense') {
+        if ($hook !== 'toplevel_page_wts-settings') {
             return;
         }
         

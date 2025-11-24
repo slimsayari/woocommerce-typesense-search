@@ -201,6 +201,21 @@ class WTS_Typesense_Client {
             $document
         );
     }
+
+    /**
+     * Upsert document
+     *
+     * @param string $collection
+     * @param array $document
+     * @return array|WP_Error
+     */
+    public function upsert_document($collection, $document) {
+        return $this->request(
+            "/collections/{$collection}/documents?action=upsert",
+            'POST',
+            $document
+        );
+    }
     
     /**
      * Delete document

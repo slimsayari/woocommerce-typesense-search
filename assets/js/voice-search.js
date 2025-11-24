@@ -1,181 +1,147 @@
-(function($) {
+/**
+ * WooCommerce Typesense Search - Voice Search
+ */
+
+(function ($) {
     'use strict';
 
-    /**
-     * Voice Search Class
-     */
-    class VoiceSearch {
-        constructor() {
-            this.recognition = null;
-            this.isListening = false;
-            this.init();
-        }
-
-        init() {
-            // Check for browser support
+    const WTSVoice = {
+        init: function () {
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                console.warn('Speech recognition not supported in this browser');
-                $('.wts-voice-button').hide();
+                $('.wts-voice-trigger').hide();
+                console.log('Voice search not supported');
                 return;
             }
 
-            // Initialize speech recognition
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            this.recognition = new SpeechRecognition();
-            
+            this.recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            this.recognition.lang = 'fr-FR'; // Default to French, could be dynamic
             this.recognition.continuous = false;
             this.recognition.interimResults = false;
-            this.recognition.lang = this.getLanguage();
 
             this.bindEvents();
-        }
+        },
 
-        bindEvents() {
-            $(document).on('click', '.wts-voice-button', (e) => {
+        bindEvents: function () {
+            const self = this;
+
+            $(document).on('click', '.wts-voice-trigger', function (e) {
                 e.preventDefault();
-                this.toggleListening();
+                self.startListening($(this));
             });
 
-            if (this.recognition) {
-                this.recognition.onstart = () => {
-                    this.onStart();
-                };
+            this.recognition.onstart = function () {
+                self.showModal(wtsVoice.i18n.listening);
+            };
 
-                this.recognition.onresult = (event) => {
-                    this.onResult(event);
-                };
+            this.recognition.onend = function () {
+                // Modal will be closed by result handler or error
+            };
 
-                this.recognition.onerror = (event) => {
-                    this.onError(event);
-                };
+            this.recognition.onresult = function (event) {
+                const transcript = event.results[0][0].transcript;
+                self.handleResult(transcript);
+            };
 
-                this.recognition.onend = () => {
-                    this.onEnd();
-                };
-            }
-        }
+            this.recognition.onerror = function (event) {
+                console.error('Voice error', event.error);
+                self.updateModal(wtsVoice.i18n.error);
+                setTimeout(self.closeModal, 2000);
+            };
+        },
 
-        toggleListening() {
-            if (this.isListening) {
-                this.stopListening();
+        startListening: function ($trigger) {
+            this.$currentInput = $trigger.closest('.wts-search-input-wrapper').find('.wts-search-input');
+            this.recognition.start();
+        },
+
+        handleResult: function (transcript) {
+            const self = this;
+
+            if (wtsVoice.analyzeIntent === '1' || wtsVoice.analyzeIntent === true) {
+                this.updateModal(wtsVoice.i18n.processing);
+
+                $.ajax({
+                    url: wtsVoice.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'wts_analyze_intent',
+                        nonce: wtsVoice.nonce,
+                        query: transcript
+                    },
+                    success: function (response) {
+                        self.closeModal();
+                        if (response.success) {
+                            self.applyIntent(response.data);
+                        } else {
+                            // Fallback to simple search
+                            self.fillInput(transcript);
+                        }
+                    },
+                    error: function () {
+                        self.closeModal();
+                        self.fillInput(transcript);
+                    }
+                });
             } else {
-                this.startListening();
+                this.closeModal();
+                this.fillInput(transcript);
             }
-        }
+        },
 
-        startListening() {
-            if (!this.recognition) return;
-
-            try {
-                this.recognition.start();
-            } catch (error) {
-                console.error('Error starting speech recognition:', error);
+        fillInput: function (text) {
+            if (this.$currentInput) {
+                this.$currentInput.val(text).trigger('input').focus();
+                // Optionally submit form
+                // this.$currentInput.closest('form').submit();
             }
-        }
+        },
 
-        stopListening() {
-            if (!this.recognition) return;
-
-            try {
-                this.recognition.stop();
-            } catch (error) {
-                console.error('Error stopping speech recognition:', error);
+        applyIntent: function (intent) {
+            // Fill search term
+            if (intent.q) {
+                this.fillInput(intent.q);
             }
-        }
 
-        onStart() {
-            this.isListening = true;
-            $('.wts-voice-button').addClass('listening');
-            $('.wts-voice-status').text(wtsConfig.i18n.voiceListening);
-            
-            // Visual feedback
-            this.addPulseAnimation();
-        }
+            // Apply filters (redirect with params)
+            // This is complex because we need to map intent filters to URL params
+            // For now, we just fill the input with the original transcript or extracted query
+            // and let the user refine.
+            // Ideally, we would construct the URL here.
 
-        onResult(event) {
-            const transcript = event.results[0][0].transcript;
-            
-            // Set the search input
-            $('.wts-search-input').val(transcript).trigger('input');
-            
-            // Show notification
-            this.showNotification(`Searching for: "${transcript}"`);
-        }
+            // Example URL construction:
+            // let url = window.location.pathname + '?s=' + encodeURIComponent(intent.q || '');
+            // if (intent.filters.price_max) url += '&wts_max_price=' + intent.filters.price_max;
+            // ...
+            // window.location.href = url;
+        },
 
-        onError(event) {
-            console.error('Speech recognition error:', event.error);
-            
-            let message = 'Voice search error';
-            switch (event.error) {
-                case 'no-speech':
-                    message = 'No speech detected. Please try again.';
-                    break;
-                case 'audio-capture':
-                    message = 'No microphone found. Please check your device.';
-                    break;
-                case 'not-allowed':
-                    message = 'Microphone access denied. Please allow microphone access.';
-                    break;
-                default:
-                    message = `Voice search error: ${event.error}`;
+        showModal: function (text) {
+            if ($('#wts-voice-modal').length === 0) {
+                $('body').append(`
+                    <div id="wts-voice-modal" class="wts-voice-modal">
+                        <div class="wts-voice-content">
+                            <div class="wts-voice-icon">🎤</div>
+                            <p class="wts-voice-text"></p>
+                        </div>
+                    </div>
+                `);
             }
-            
-            this.showNotification(message, 'error');
+
+            $('#wts-voice-modal .wts-voice-text').text(text);
+            $('#wts-voice-modal').addClass('active');
+        },
+
+        updateModal: function (text) {
+            $('#wts-voice-modal .wts-voice-text').text(text);
+        },
+
+        closeModal: function () {
+            $('#wts-voice-modal').removeClass('active');
         }
+    };
 
-        onEnd() {
-            this.isListening = false;
-            $('.wts-voice-button').removeClass('listening');
-            $('.wts-voice-status').text(wtsConfig.i18n.voiceStart);
-            
-            // Remove visual feedback
-            this.removePulseAnimation();
-        }
-
-        addPulseAnimation() {
-            $('.wts-voice-button').append('<span class="wts-pulse"></span>');
-        }
-
-        removePulseAnimation() {
-            $('.wts-pulse').remove();
-        }
-
-        showNotification(message, type = 'info') {
-            const notification = $(`
-                <div class="wts-notification wts-notification-${type}">
-                    ${message}
-                </div>
-            `);
-
-            $('body').append(notification);
-
-            setTimeout(() => {
-                notification.addClass('show');
-            }, 10);
-
-            setTimeout(() => {
-                notification.removeClass('show');
-                setTimeout(() => {
-                    notification.remove();
-                }, 300);
-            }, 3000);
-        }
-
-        getLanguage() {
-            // Get language from HTML lang attribute or default to French
-            const htmlLang = $('html').attr('lang');
-            if (htmlLang) {
-                return htmlLang;
-            }
-            return 'fr-FR';
-        }
-    }
-
-    // Initialize on document ready
-    $(document).ready(() => {
-        if (wtsConfig.voiceEnabled && $('.wts-voice-button').length) {
-            new VoiceSearch();
-        }
+    $(document).ready(function () {
+        WTSVoice.init();
     });
 
 })(jQuery);

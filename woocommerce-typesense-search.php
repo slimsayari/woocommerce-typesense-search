@@ -29,6 +29,19 @@ define('WTS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WTS_PLUGIN_BASENAME', plugin_basename(__FILE__));
 
 /**
+ * Déclarer la compatibilité avec HPOS (High-Performance Order Storage)
+ */
+add_action('before_woocommerce_init', function() {
+    if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
+            'custom_order_tables',
+            __FILE__,
+            true
+        );
+    }
+});
+
+/**
  * Main WooCommerce Typesense Search Class
  */
 class WooCommerce_Typesense_Search {
@@ -85,6 +98,12 @@ class WooCommerce_Typesense_Search {
         require_once WTS_PLUGIN_DIR . 'includes/class-admin-settings.php';
         require_once WTS_PLUGIN_DIR . 'includes/class-search-widget.php';
         require_once WTS_PLUGIN_DIR . 'includes/class-rest-api.php';
+        require_once WTS_PLUGIN_DIR . 'includes/class-sync-manager.php';
+        require_once WTS_PLUGIN_DIR . 'includes/class-faceted-search.php';
+        require_once WTS_PLUGIN_DIR . 'includes/class-autocomplete.php';
+        require_once WTS_PLUGIN_DIR . 'includes/class-semantic-search.php';
+        require_once WTS_PLUGIN_DIR . 'includes/class-voice-search.php';
+        require_once WTS_PLUGIN_DIR . 'includes/class-image-search.php';
     }
     
     /**
@@ -104,6 +123,49 @@ class WooCommerce_Typesense_Search {
         
         // Initialize product indexer
         WTS_Product_Indexer::instance();
+        
+        // Initialize sync manager
+        WTS_Sync_Manager::instance();
+        
+        // Initialize faceted search
+        WTS_Faceted_Search::instance();
+        
+        // Initialize autocomplete
+        WTS_Autocomplete::instance();
+        
+        // Initialize semantic search
+        WTS_Semantic_Search::instance();
+        
+        // Initialize voice search
+        WTS_Voice_Search::instance();
+        
+        // Initialize image search
+        WTS_Image_Search::instance();
+        
+        // Enqueue front-end scripts
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_scripts'));
+    }
+    
+    /**
+     * Enqueue frontend scripts and styles
+     */
+    public function enqueue_frontend_scripts() {
+        if (is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy()) {
+            wp_enqueue_style(
+                'wts-search',
+                WTS_PLUGIN_URL . 'assets/css/search.css',
+                array(),
+                WTS_VERSION
+            );
+            
+            wp_enqueue_script(
+                'wts-filters',
+                WTS_PLUGIN_URL . 'assets/js/filters.js',
+                array('jquery'),
+                WTS_VERSION,
+                true
+            );
+        }
     }
     
     /**
