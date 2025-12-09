@@ -1,0 +1,258 @@
+/* Enhanced Header Search Styles */
+
+/* Container adjustments for better header integration */
+.header-search-container {
+    flex: 1;
+    max-width: 500px;
+    position: relative;
+}
+
+@media (max-width: 991px) {
+    .header-search-container {
+        max-width: 100%;
+        margin: 1rem 0;
+        order: 10;
+        /* Move to bottom on mobile */
+    }
+}
+
+/* Ensure search is visible in navbar */
+.navbar .header-search-container {
+    display: block !important;
+}
+
+/* Mobile navbar adjustments */
+@media (max-width: 991px) {
+    .navbar-collapse .header-search-container {
+        width: 100%;
+        padding: 1rem 0;
+        border-top: 1px solid #e0e0e0;
+        margin-top: 1rem;
+    }
+}
+
+/* Fix z-index issues with navbar */
+.navbar {
+    position: relative;
+    z-index: 1030;
+}
+
+.wts-autocomplete-dropdown,
+.wts-image-preview-container {
+    z-index: 1040;
+}
+
+/* Improve visibility on light backgrounds */
+.navbar-light .wts-search-input-container {
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Active state improvements */
+.wts-action-btn.listening {
+    color: #dc3545;
+    background: rgba(220, 53, 69, 0.1);
+}
+
+.wts-action-btn.analyzing {
+    color: #007bff;
+    background: rgba(0, 123, 255, 0.1);
+}
+
+/* Autocomplete results styling */
+.wts-autocomplete-result {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.wts-autocomplete-result:hover {
+    background: #f8f9fa;
+}
+
+.wts-autocomplete-result:last-child {
+    border-bottom: none;
+}
+
+.wts-autocomplete-result-image {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-right: 1rem;
+}
+
+.wts-autocomplete-result-info {
+    flex: 1;
+}
+
+.wts-autocomplete-result-title {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 0.25rem;
+}
+
+.wts-autocomplete-result-price {
+    color: #007bff;
+    font-weight: 600;
+}
+
+.wts-autocomplete-result-category {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+/* Section headers in autocomplete */
+.wts-autocomplete-section {
+    padding: 0.5rem 1rem;
+    background: #f8f9fa;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* No results message */
+.wts-autocomplete-no-results {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: #999;
+}
+
+/* Loading state */
+.wts-autocomplete-loading.active {
+    display: flex !important;
+}
+
+/* Image preview improvements */
+.wts-image-preview {
+    position: relative;
+    display: inline-block;
+}
+
+.wts-image-preview-img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border: 2px solid #e0e0e0;
+}
+
+.wts-image-remove {
+    transition: all 0.2s ease;
+}
+
+.wts-image-remove:hover {
+    background: #c82333;
+    transform: scale(1.1);
+}
+
+/* Voice search animation */
+@keyframes voice-pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+}
+
+.wts-action-btn.listening svg {
+    animation: voice-pulse 1s ease-in-out infinite;
+}
+
+/* Smooth transitions */
+.wts-autocomplete-dropdown,
+.wts-image-preview-container {
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.wts-autocomplete-dropdown[style*="display: block"],
+.wts-image-preview-container[style*="display: block"] {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Focus improvements for accessibility */
+.wts-header-search-input:focus {
+    outline: none;
+}
+
+.wts-action-btn:focus {
+    outline: 2px solid #007bff;
+    outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .wts-search-input-container {
+        border-width: 3px;
+    }
+
+    .wts-autocomplete-result:hover {
+        background: #000;
+        color: #fff;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+
+    .wts-spinner,
+    .wts-action-btn.listening svg,
+    .wts-autocomplete-dropdown,
+    .wts-image-preview-container {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* Dark mode support (if theme supports it) */
+@media (prefers-color-scheme: dark) {
+    .wts-search-input-container {
+        background: #2d2d2d;
+        border-color: #444;
+    }
+
+    .wts-header-search-input {
+        color: #fff;
+    }
+
+    .wts-search-icon,
+    .wts-action-btn {
+        color: #ccc;
+    }
+
+    .wts-autocomplete-dropdown,
+    .wts-image-preview-container {
+        background: #2d2d2d;
+        border-color: #444;
+    }
+
+    .wts-autocomplete-result {
+        border-bottom-color: #444;
+    }
+
+    .wts-autocomplete-result:hover {
+        background: #3d3d3d;
+    }
+
+    .wts-autocomplete-result-title {
+        color: #fff;
+    }
+
+    .wts-autocomplete-section {
+        background: #1d1d1d;
+        color: #999;
+    }
+}

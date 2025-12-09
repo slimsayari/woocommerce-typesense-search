@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WTS_VERSION', '1.0.0');
+define('WTS_VERSION', '1.0.4');
 define('WTS_PLUGIN_FILE', __FILE__);
 define('WTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WTS_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -31,7 +31,7 @@ define('WTS_PLUGIN_BASENAME', plugin_basename(__FILE__));
 /**
  * Déclarer la compatibilité avec HPOS (High-Performance Order Storage)
  */
-add_action('before_woocommerce_init', function() {
+add_action('before_woocommerce_init', function () {
     if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
         \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
             'custom_order_tables',
@@ -44,54 +44,59 @@ add_action('before_woocommerce_init', function() {
 /**
  * Main WooCommerce Typesense Search Class
  */
-class WooCommerce_Typesense_Search {
-    
+class WooCommerce_Typesense_Search
+{
+
     /**
      * Single instance of the class
      *
      * @var WooCommerce_Typesense_Search
      */
     protected static $_instance = null;
-    
+
     /**
      * Main Instance
      *
      * @return WooCommerce_Typesense_Search
      */
-    public static function instance() {
+    public static function instance()
+    {
         if (is_null(self::$_instance)) {
             self::$_instance = new self();
         }
         return self::$_instance;
     }
-    
+
     /**
      * Constructor
      */
-    public function __construct() {
+    public function __construct()
+    {
         $this->init_hooks();
         $this->includes();
         $this->init_components();
     }
-    
+
     /**
      * Initialize hooks
      */
-    private function init_hooks() {
+    private function init_hooks()
+    {
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
-        
+
         add_action('plugins_loaded', array($this, 'load_textdomain'));
         add_action('init', array($this, 'init'));
-        
+
         // Check for WooCommerce dependency
         add_action('admin_init', array($this, 'check_dependencies'));
     }
-    
+
     /**
      * Include required files
      */
-    private function includes() {
+    private function includes()
+    {
         // Core classes
         require_once WTS_PLUGIN_DIR . 'includes/class-typesense-client.php';
         require_once WTS_PLUGIN_DIR . 'includes/class-product-indexer.php';
@@ -104,60 +109,163 @@ class WooCommerce_Typesense_Search {
         require_once WTS_PLUGIN_DIR . 'includes/class-semantic-search.php';
         require_once WTS_PLUGIN_DIR . 'includes/class-voice-search.php';
         require_once WTS_PLUGIN_DIR . 'includes/class-image-search.php';
+        require_once WTS_PLUGIN_DIR . 'includes/class-ajax.php';
+        require_once WTS_PLUGIN_DIR . 'includes/class-url-manager.php';
     }
-    
+
     /**
      * Initialize plugin components
      */
-    private function init_components() {
+    private function init_components()
+    {
         // Initialize admin settings
         if (is_admin()) {
             WTS_Admin_Settings::instance();
         }
-        
+
         // Initialize REST API
         WTS_Rest_API::instance();
-        
+
         // Initialize search widget
         WTS_Search_Widget::instance();
-        
+
         // Initialize product indexer
         WTS_Product_Indexer::instance();
-        
+
         // Initialize sync manager
         WTS_Sync_Manager::instance();
-        
+
         // Initialize faceted search
         WTS_Faceted_Search::instance();
-        
+
         // Initialize autocomplete
         WTS_Autocomplete::instance();
-        
+
         // Initialize semantic search
         WTS_Semantic_Search::instance();
-        
+
         // Initialize voice search
         WTS_Voice_Search::instance();
-        
+
         // Initialize image search
         WTS_Image_Search::instance();
-        
+
+        // Initialize AJAX handler
+        WTS_Ajax::instance();
+
+        // Initialize URL manager
+        WTS_URL_Manager::instance();
+
         // Enqueue front-end scripts
         add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_scripts'));
+
+        // Override WooCommerce templates
+        add_filter('template_include', array($this, 'override_woocommerce_template'), 99);
     }
-    
+
     /**
      * Enqueue frontend scripts and styles
      */
-    public function enqueue_frontend_scripts() {
-        if (is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy()) {
-            wp_enqueue_style(
-                'wts-search',
-                WTS_PLUGIN_URL . 'assets/css/search.css',
-                array(),
-                WTS_VERSION
+    public function enqueue_frontend_scripts()
+    {
+        // Always load header search scripts (autocomplete, voice, image)
+        wp_enqueue_style(
+            'wts-search',
+            WTS_PLUGIN_URL . 'assets/css/search.css',
+            array(),
+            WTS_VERSION
+        );
+
+        wp_enqueue_style(
+            'wts-header-search',
+            WTS_PLUGIN_URL . 'assets/css/header-search.css',
+            array('wts-search'),
+            WTS_VERSION
+        );
+
+        // Autocomplete CSS (important for dropdown display)
+        wp_enqueue_style(
+            'wts-autocomplete',
+            WTS_PLUGIN_URL . 'assets/css/autocomplete.css',
+            array('wts-search'),
+            WTS_VERSION
+        );
+
+        wp_enqueue_script(
+            'wts-autocomplete',
+            WTS_PLUGIN_URL . 'assets/js/autocomplete.js',
+            array('jquery'),
+            WTS_VERSION,
+            true
+        );
+
+        wp_localize_script('wts-autocomplete', 'wtsAutocomplete', array(
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('wts_autocomplete'),
+            'minChars' => 2,
+            'delay' => 300,
+        ));
+
+        // Load voice search if enabled
+        if (WooCommerce_Typesense_Search::get_setting('voice_search_enabled', false)) {
+            wp_enqueue_script(
+                'wts-voice-search',
+                WTS_PLUGIN_URL . 'assets/js/voice-search.js',
+                array('jquery'),
+                WTS_VERSION,
+                true
             );
-            
+
+            wp_localize_script('wts-voice-search', 'wtsVoice', array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('wts_voice_search'),
+                'analyzeIntent' => WooCommerce_Typesense_Search::get_setting('semantic_search_enabled', false),
+                'i18n' => array(
+                    'listening' => __('Écoute en cours...', 'woocommerce-typesense-search'),
+                    'processing' => __('Analyse...', 'woocommerce-typesense-search'),
+                    'error' => __('Erreur lors de la reconnaissance vocale.', 'woocommerce-typesense-search'),
+                    'notSupported' => __('Votre navigateur ne supporte pas la recherche vocale.', 'woocommerce-typesense-search'),
+                ),
+            ));
+        }
+
+        // Load image search if enabled
+        if (WooCommerce_Typesense_Search::get_setting('image_search_enabled', false)) {
+            wp_enqueue_script(
+                'wts-image-search',
+                WTS_PLUGIN_URL . 'assets/js/image-search.js',
+                array('jquery'),
+                WTS_VERSION,
+                true
+            );
+
+            wp_localize_script('wts-image-search', 'wtsImage', array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('wts_image_search'),
+                'maxSize' => 5 * 1024 * 1024, // 5MB
+                'i18n' => array(
+                    'dropHere' => __('Déposez une image ici ou cliquez pour uploader', 'woocommerce-typesense-search'),
+                    'analyzing' => __('Analyse de l\'image...', 'woocommerce-typesense-search'),
+                    'error' => __('Erreur lors de l\'analyse.', 'woocommerce-typesense-search'),
+                    'fileTooBig' => __('L\'image est trop volumineuse (max 5MB).', 'woocommerce-typesense-search'),
+                ),
+            ));
+        }
+
+        // Load filters script only on shop pages
+        $should_load_filters = is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy();
+
+        // Also load on product search pages
+        if (is_search() && isset($_GET['post_type']) && $_GET['post_type'] === 'product') {
+            $should_load_filters = true;
+        }
+
+        // Also load if there's a product search query
+        if (is_search() && get_query_var('post_type') === 'product') {
+            $should_load_filters = true;
+        }
+
+        if ($should_load_filters) {
             wp_enqueue_script(
                 'wts-filters',
                 WTS_PLUGIN_URL . 'assets/js/filters.js',
@@ -165,13 +273,44 @@ class WooCommerce_Typesense_Search {
                 WTS_VERSION,
                 true
             );
+
+            wp_localize_script('wts-filters', 'wtsFilters', array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('wts_filter_nonce'),
+                'i18n' => array(
+                    'oneResult' => __('1 résultat', 'woocommerce-typesense-search'),
+                    'results' => __('résultats', 'woocommerce-typesense-search'),
+                    'loading' => __('Chargement...', 'woocommerce-typesense-search'),
+                    'noResults' => __('Aucun produit trouvé', 'woocommerce-typesense-search'),
+                ),
+            ));
         }
     }
-    
+
+    /**
+     * Override WooCommerce templates with plugin templates
+     *
+     * @param string $template
+     * @return string
+     */
+    public function override_woocommerce_template($template)
+    {
+        // Only override on shop/product archive pages
+        if (is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy()) {
+            $plugin_template = WTS_PLUGIN_DIR . 'templates/archive-product.php';
+            if (file_exists($plugin_template)) {
+                return $plugin_template;
+            }
+        }
+
+        return $template;
+    }
+
     /**
      * Plugin activation
      */
-    public function activate() {
+    public function activate()
+    {
         // Create default options
         $default_options = array(
             'enabled' => false,
@@ -189,33 +328,35 @@ class WooCommerce_Typesense_Search {
             'semantic_search_enabled' => false,
             'openai_api_key' => '',
         );
-        
+
         add_option('wts_settings', $default_options);
-        
+
         // Create analytics table
         $this->create_analytics_table();
-        
+
         // Flush rewrite rules
         flush_rewrite_rules();
     }
-    
+
     /**
      * Plugin deactivation
      */
-    public function deactivate() {
+    public function deactivate()
+    {
         // Flush rewrite rules
         flush_rewrite_rules();
     }
-    
+
     /**
      * Create analytics table
      */
-    private function create_analytics_table() {
+    private function create_analytics_table()
+    {
         global $wpdb;
-        
+
         $table_name = $wpdb->prefix . 'wts_analytics';
         $charset_collate = $wpdb->get_charset_collate();
-        
+
         $sql = "CREATE TABLE IF NOT EXISTS $table_name (
             id bigint(20) NOT NULL AUTO_INCREMENT,
             search_term varchar(255) NOT NULL,
@@ -229,61 +370,67 @@ class WooCommerce_Typesense_Search {
             KEY search_term (search_term),
             KEY created_at (created_at)
         ) $charset_collate;";
-        
+
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
     }
-    
+
     /**
      * Load plugin textdomain
      */
-    public function load_textdomain() {
+    public function load_textdomain()
+    {
         load_plugin_textdomain(
             'woocommerce-typesense-search',
             false,
             dirname(WTS_PLUGIN_BASENAME) . '/languages'
         );
     }
-    
+
     /**
      * Initialize plugin
      */
-    public function init() {
+    public function init()
+    {
         // Register shortcodes
         add_shortcode('wts_search', array($this, 'search_shortcode'));
-        
+
         // Hook for WPML/Polylang support
         do_action('wts_init');
     }
-    
+
     /**
      * Check plugin dependencies
      */
-    public function check_dependencies() {
+    public function check_dependencies()
+    {
         if (!class_exists('WooCommerce')) {
             add_action('admin_notices', array($this, 'woocommerce_missing_notice'));
             deactivate_plugins(WTS_PLUGIN_BASENAME);
         }
     }
-    
+
     /**
      * WooCommerce missing notice
      */
-    public function woocommerce_missing_notice() {
+    public function woocommerce_missing_notice()
+    {
         ?>
         <div class="error">
-            <p><?php _e('WooCommerce Typesense Search requires WooCommerce to be installed and activated.', 'woocommerce-typesense-search'); ?></p>
+            <p><?php _e('WooCommerce Typesense Search requires WooCommerce to be installed and activated.', 'woocommerce-typesense-search'); ?>
+            </p>
         </div>
         <?php
     }
-    
+
     /**
      * Search shortcode
      *
      * @param array $atts
      * @return string
      */
-    public function search_shortcode($atts) {
+    public function search_shortcode($atts)
+    {
         $atts = shortcode_atts(array(
             'placeholder' => __('Search products...', 'woocommerce-typesense-search'),
             'show_filters' => 'yes',
@@ -291,7 +438,7 @@ class WooCommerce_Typesense_Search {
             'show_image' => 'yes',
             'results_per_page' => 12,
         ), $atts);
-        
+
         ob_start();
         wc_get_template(
             'search-form.php',
@@ -301,16 +448,17 @@ class WooCommerce_Typesense_Search {
         );
         return ob_get_clean();
     }
-    
+
     /**
      * Get plugin settings
      *
      * @return array
      */
-    public static function get_settings() {
+    public static function get_settings()
+    {
         return get_option('wts_settings', array());
     }
-    
+
     /**
      * Get specific setting
      *
@@ -318,7 +466,8 @@ class WooCommerce_Typesense_Search {
      * @param mixed $default
      * @return mixed
      */
-    public static function get_setting($key, $default = null) {
+    public static function get_setting($key, $default = null)
+    {
         $settings = self::get_settings();
         return isset($settings[$key]) ? $settings[$key] : $default;
     }
@@ -329,7 +478,8 @@ class WooCommerce_Typesense_Search {
  *
  * @return WooCommerce_Typesense_Search
  */
-function WTS() {
+function WTS()
+{
     return WooCommerce_Typesense_Search::instance();
 }
 
